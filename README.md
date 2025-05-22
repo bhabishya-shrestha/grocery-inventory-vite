@@ -32,12 +32,14 @@ A modern, responsive web application for managing grocery inventory built with R
 ### Installation
 
 1. Clone the repository:
+
 ```bash
 git clone [your-repository-url]
 cd grocery-inventory-vite
 ```
 
 2. Install dependencies:
+
 ```bash
 npm install
 # or
@@ -45,6 +47,7 @@ yarn install
 ```
 
 3. Start the development server:
+
 ```bash
 npm run dev
 # or
@@ -84,21 +87,25 @@ src/
 ## Features in Detail
 
 ### Inventory Management
+
 - Add, edit, and remove inventory items
 - Track quantity and categories
 - Set minimum threshold for low stock alerts
 
 ### Search and Filter
+
 - Real-time search functionality
 - Filter by name or category
 - Instant results updates
 
 ### Statistics Dashboard
+
 - Total items count
 - Low stock items tracking
 - Category analytics
 
 ### Barcode Scanner
+
 - Integrated barcode scanning capability
 - Quick item lookup
 - Streamlined inventory updates
