@@ -1,4 +1,4 @@
-# Grocery Inventory Management System
+# Inventory Restocking Management System
 
 A modern, responsive web application for managing grocery inventory built with React, TypeScript, and Vite.
 
