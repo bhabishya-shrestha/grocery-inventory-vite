@@ -1,425 +1,189 @@
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState } from "react";
+import { MdAdd, MdQrCodeScanner, MdClose } from "react-icons/md";
 import BarcodeScanner from "./BarcodeScanner";
 import InventoryList from "./InventoryList";
-import { MdAdd, MdSync, MdQrCodeScanner, MdClose } from "react-icons/md";
-import Notification from "./Notification";
-import type { NotificationType } from "./Notification";
-
-interface InventoryItem {
-  id: string;
-  name: string;
-  quantity: number;
-  category?: string;
-  minThreshold?: number;
-}
-
-interface FormErrors {
-  name?: string;
-  quantity?: string;
-  category?: string;
-  minThreshold?: string;
-}
+import InventoryStats from "./InventoryStats";
+import AddItemModal from "./AddItemModal";
+import { useInventory } from "../hooks/useInventory";
+import { useNotification } from "../hooks/useNotification";
+import type { InventoryItem } from "../types/inventory";
 
 // HomePage component: Main dashboard for the grocery inventory app.
-// - Displays current inventory (via InventoryList)
-// - Provides a button to launch the BarcodeScanner
-// - Handles toggling the scanner UI
 const HomePage: React.FC = () => {
   const [showScanner, setShowScanner] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [notification, setNotification] = useState<{
-    type: NotificationType;
-    message: string;
-    isVisible: boolean;
-  }>({
-    type: "success",
-    message: "",
-    isVisible: false,
-  });
-  const [formErrors, setFormErrors] = useState<FormErrors>({});
 
-  const [inventory, setInventory] = useState<InventoryItem[]>([
-    {
-      id: "1",
-      name: "Apples",
-      quantity: 10,
-      category: "Fruits",
-      minThreshold: 5,
-    },
-    {
-      id: "2",
-      name: "Bananas",
-      quantity: 5,
-      category: "Fruits",
-      minThreshold: 3,
-    },
-    { id: "3", name: "Milk", quantity: 2, category: "Dairy", minThreshold: 2 },
-    {
-      id: "4",
-      name: "Bread",
-      quantity: 4,
-      category: "Bakery",
-      minThreshold: 2,
-    },
-    { id: "5", name: "Eggs", quantity: 12, category: "Dairy", minThreshold: 6 },
-  ]);
+  const {
+    inventory,
+    stats,
+    isLoading,
+    error,
+    addItem,
+    deleteItem,
+    updateQuantity,
+    isAdding,
+    isUpdating,
+    isDeleting,
+  } = useInventory();
 
-  const [newItem, setNewItem] = useState<Partial<InventoryItem>>({
-    name: "",
-    quantity: 0,
-    category: "",
-    minThreshold: 0,
-  });
+  const { notification, showNotification } = useNotification();
 
-  const showNotification = useCallback(
-    (type: NotificationType, message: string) => {
-      setNotification({ type, message, isVisible: true });
-      setTimeout(() => {
-        setNotification((prev) => ({ ...prev, isVisible: false }));
-      }, 3000);
-    },
-    []
-  );
-
-  const validateForm = useCallback((): boolean => {
-    const errors: FormErrors = {};
-
-    if (!newItem.name?.trim()) {
-      errors.name = "Name is required";
-    }
-
-    if (typeof newItem.quantity !== "number" || newItem.quantity < 0) {
-      errors.quantity = "Please enter a valid quantity";
-    }
-
-    if (
-      newItem.minThreshold !== undefined &&
-      (typeof newItem.minThreshold !== "number" || newItem.minThreshold < 0)
-    ) {
-      errors.minThreshold = "Please enter a valid minimum threshold";
-    }
-
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
-  }, [newItem]);
-
-  const handleAddItem = useCallback(async () => {
-    if (!validateForm()) {
-      showNotification("error", "Please fix the form errors");
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      setInventory((prev) => [
-        ...prev,
-        {
-          id: Date.now().toString(),
-          name: newItem.name!,
-          quantity: newItem.quantity!,
-          category: newItem.category,
-          minThreshold: newItem.minThreshold,
-        },
-      ]);
-
-      setNewItem({ name: "", quantity: 0, category: "", minThreshold: 0 });
-      setShowAddModal(false);
-      showNotification("success", "Item added successfully");
-    } catch {
-      showNotification("error", "Failed to add item");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [newItem, validateForm, showNotification]);
-
-  const handleDeleteItem = useCallback(
-    async (id: string) => {
-      setIsLoading(true);
-      try {
-        // Simulate API call
-        await new Promise((resolve) => setTimeout(resolve, 500));
-
-        setInventory((prev) => prev.filter((item) => item.id !== id));
-        showNotification("success", "Item deleted successfully");
-      } catch {
-        showNotification("error", "Failed to delete item");
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [showNotification]
-  );
-
-  const handleRefresh = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      showNotification("success", "Inventory refreshed");
-    } catch {
-      showNotification("error", "Failed to refresh inventory");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [showNotification]);
-
-  // Stats calculations with animations
-  const [stats, setStats] = useState({
-    totalItems: 0,
-    lowStockItems: 0,
-    categories: 0,
-  });
-
-  // Update stats with animation
-  React.useEffect(() => {
-    const newStats = {
-      totalItems: inventory.reduce((sum, item) => sum + item.quantity, 0),
-      lowStockItems: inventory.filter(
-        (item) => item.quantity <= (item.minThreshold || 0)
-      ).length,
-      categories: [...new Set(inventory.map((item) => item.category))].length,
-    };
-    setStats(newStats);
-  }, [inventory]);
-
-  const handleUpdateQuantity = useCallback((id: string, quantity: number) => {
-    setInventory((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, quantity: Math.max(0, quantity) } : item
-      )
+  const filteredInventory = React.useMemo(() => {
+    if (!inventory) return [];
+    return inventory.filter(
+      (item: InventoryItem) =>
+        item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.category?.toLowerCase().includes(searchQuery.toLowerCase())
     );
-  }, []);
+  }, [inventory, searchQuery]);
 
-  // Filter inventory consistently
-  const filteredInventory = useMemo(
-    () =>
-      inventory.filter(
-        (item) =>
-          item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          item.category?.toLowerCase().includes(searchQuery.toLowerCase())
-      ),
-    [inventory, searchQuery]
-  );
+  const handleAddItem = async (item: Omit<InventoryItem, "id">) => {
+    try {
+      await addItem(item);
+      setShowAddModal(false);
+      showNotification("Item added successfully", "success");
+    } catch (err) {
+      showNotification("Failed to add item", "error");
+      console.error(err);
+    }
+  };
+
+  const handleDeleteItem = async (id: string) => {
+    try {
+      await deleteItem(id);
+      showNotification("Item deleted successfully", "success");
+    } catch (err) {
+      showNotification("Failed to delete item", "error");
+      console.error(err);
+    }
+  };
+
+  const handleUpdateQuantity = async (id: string, quantity: number) => {
+    try {
+      if (quantity >= 0) {
+        await updateQuantity(id, quantity);
+      }
+    } catch (err) {
+      showNotification("Failed to update quantity", "error");
+      console.error(err);
+    }
+  };
+
+  const handleBarcodeScanned = (barcode: string) => {
+    // TODO: Implement barcode lookup
+    console.log("Scanned barcode:", barcode);
+    setShowScanner(false);
+  };
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-100 p-8">
+        <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded">
+          <p className="text-red-700">Error loading inventory</p>
+          <p className="text-sm text-red-600">
+            {error instanceof Error ? error.message : "Unknown error"}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6">
-      <Notification
-        type={notification.type}
-        message={notification.message}
-        isVisible={notification.isVisible}
-        onClose={() =>
-          setNotification((prev) => ({ ...prev, isVisible: false }))
-        }
-      />
-
-      <div className="max-w-7xl mx-auto">
-        <div className="flex flex-col gap-6">
-          {/* Stats Section */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-white p-6 rounded-lg shadow-sm">
-              <div className="text-xl font-semibold text-gray-900">
-                {stats.totalItems}
-              </div>
-              <div className="text-sm text-gray-500">Total Items</div>
-            </div>
-            <div className="bg-white p-6 rounded-lg shadow-sm">
-              <div className="text-xl font-semibold text-gray-900">
-                {stats.lowStockItems}
-              </div>
-              <div className="text-sm text-gray-500">Low Stock Items</div>
-            </div>
-            <div className="bg-white p-6 rounded-lg shadow-sm">
-              <div className="text-xl font-semibold text-gray-900">
-                {stats.categories}
-              </div>
-              <div className="text-sm text-gray-500">Categories</div>
-            </div>
-          </div>
-
-          {/* Search and Actions */}
-          <div className="flex flex-wrap gap-4 items-center justify-between">
-            <div className="flex-1 min-w-[200px]">
-              <input
-                type="text"
-                placeholder="Search inventory..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full px-4 py-2 rounded-md border border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-              />
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setShowAddModal(true)}
-                disabled={isLoading}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 flex items-center gap-2"
-              >
-                <MdAdd className="w-5 h-5" />
-                Add Item
-              </button>
-              <button
-                onClick={handleRefresh}
-                disabled={isLoading}
-                className="p-2 text-gray-600 hover:text-gray-900 rounded-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50"
-              >
-                <MdSync
-                  className={`w-5 h-5 ${isLoading ? "animate-spin" : ""}`}
-                />
-              </button>
+    <div className="min-h-screen bg-gray-100">
+      {/* Header */}
+      <header className="bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex justify-between items-center">
+            <h1 className="text-2xl font-semibold text-gray-900">
+              Inventory Management
+            </h1>
+            <div className="flex items-center space-x-4">
               <button
                 onClick={() => setShowScanner(true)}
-                className="p-2 text-gray-600 hover:text-gray-900 rounded-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                className="p-2 text-gray-400 hover:text-gray-600"
               >
                 <MdQrCodeScanner className="w-5 h-5" />
               </button>
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
+              >
+                <MdAdd className="w-5 h-5 mr-1" />
+                Add Item
+              </button>
             </div>
+          </div>
+          <div className="mt-4">
+            <input
+              type="text"
+              placeholder="Search inventory..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            />
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="container mx-auto px-4 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Inventory Stats */}
+          <div className="lg:col-span-1">
+            <InventoryStats
+              totalItems={stats.totalItems}
+              lowStockItems={stats.lowStockItems}
+              categories={stats.categories}
+              isLoading={isLoading}
+            />
           </div>
 
           {/* Inventory List */}
-          <InventoryList
-            inventory={filteredInventory}
-            onDelete={handleDeleteItem}
-            onUpdateQuantity={handleUpdateQuantity}
-          />
+          <div className="lg:col-span-3">
+            <InventoryList
+              inventory={filteredInventory}
+              onDelete={handleDeleteItem}
+              onUpdateQuantity={handleUpdateQuantity}
+              isLoading={isLoading}
+              isUpdating={isUpdating}
+              isDeleting={isDeleting}
+            />
+          </div>
         </div>
-      </div>
+      </main>
 
       {/* Add Item Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold">Add New Item</h2>
+        <AddItemModal
+          onClose={() => setShowAddModal(false)}
+          onSubmit={handleAddItem}
+          isLoading={isAdding}
+        />
+      )}
+
+      {/* Barcode Scanner Modal */}
+      {showScanner && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg w-full max-w-lg">
+            <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+              <h3 className="text-lg font-semibold">Scan Barcode</h3>
               <button
-                onClick={() => setShowAddModal(false)}
-                className="text-gray-500 hover:text-gray-700"
+                onClick={() => setShowScanner(false)}
+                className="text-gray-400 hover:text-gray-600"
               >
                 <MdClose className="w-6 h-6" />
               </button>
             </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Name
-                </label>
-                <input
-                  type="text"
-                  value={newItem.name}
-                  onChange={(e) =>
-                    setNewItem((prev) => ({ ...prev, name: e.target.value }))
-                  }
-                  className={`mt-1 block w-full rounded-md border ${
-                    formErrors.name ? "border-red-300" : "border-gray-300"
-                  } shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500`}
-                />
-                {formErrors.name && (
-                  <p className="mt-1 text-sm text-red-600">{formErrors.name}</p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Quantity
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={newItem.quantity}
-                  onChange={(e) =>
-                    setNewItem((prev) => ({
-                      ...prev,
-                      quantity: Math.max(0, parseInt(e.target.value) || 0),
-                    }))
-                  }
-                  className={`mt-1 block w-full rounded-md border ${
-                    formErrors.quantity ? "border-red-300" : "border-gray-300"
-                  } shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500`}
-                />
-                {formErrors.quantity && (
-                  <p className="mt-1 text-sm text-red-600">
-                    {formErrors.quantity}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Category
-                </label>
-                <input
-                  type="text"
-                  value={newItem.category}
-                  onChange={(e) =>
-                    setNewItem((prev) => ({
-                      ...prev,
-                      category: e.target.value,
-                    }))
-                  }
-                  className={`mt-1 block w-full rounded-md border ${
-                    formErrors.category ? "border-red-300" : "border-gray-300"
-                  } shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500`}
-                />
-                {formErrors.category && (
-                  <p className="mt-1 text-sm text-red-600">
-                    {formErrors.category}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Minimum Threshold
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={newItem.minThreshold}
-                  onChange={(e) =>
-                    setNewItem((prev) => ({
-                      ...prev,
-                      minThreshold: Math.max(0, parseInt(e.target.value) || 0),
-                    }))
-                  }
-                  className={`mt-1 block w-full rounded-md border ${
-                    formErrors.minThreshold
-                      ? "border-red-300"
-                      : "border-gray-300"
-                  } shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500`}
-                />
-                {formErrors.minThreshold && (
-                  <p className="mt-1 text-sm text-red-600">
-                    {formErrors.minThreshold}
-                  </p>
-                )}
-              </div>
-
-              <div className="flex justify-end space-x-3 mt-6">
-                <button
-                  onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
-                  disabled={isLoading}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleAddItem}
-                  disabled={isLoading}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-                >
-                  {isLoading ? "Adding..." : "Add Item"}
-                </button>
-              </div>
+            <div className="p-4">
+              <BarcodeScanner
+                onScan={handleBarcodeScanned}
+                onClose={() => setShowScanner(false)}
+              />
             </div>
           </div>
         </div>
       )}
-
-      {showScanner && <BarcodeScanner onClose={() => setShowScanner(false)} />}
     </div>
   );
 };
