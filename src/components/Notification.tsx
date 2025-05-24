@@ -48,7 +48,9 @@ const Notification: React.FC<NotificationProps> = ({
 
   return (
     <div
-      className={`fixed top-4 right-4 z-50 rounded-lg p-4 ${bgColors[type]} shadow-lg transform transition-all duration-300 ${
+      className={`fixed top-4 right-4 z-50 rounded-lg p-4 ${
+        bgColors[type]
+      } shadow-lg transform transition-all duration-300 ${
         isVisible ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"
       }`}
     >
